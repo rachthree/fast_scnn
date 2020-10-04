@@ -1,0 +1,5 @@
+.idea
+fast_scnn.egg*
+data
+model_training
+*.pyc

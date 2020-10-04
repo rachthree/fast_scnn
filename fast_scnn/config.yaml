@@ -1,0 +1,14 @@
+train:
+  train_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\train
+  train_label_dir: E:\datasets\Cityscapes\gtFine\train
+  val_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\train
+  val_label_dir: E:\datasets\Cityscapes\gtFine\val
+  # sess_name:
+  # seed:
+  # epochs:
+  batch_size: 12
+  # end_learning_rate:
+  # save_dir:
+  # input_names:
+  # output_names:
+  autotune_dataset: False
