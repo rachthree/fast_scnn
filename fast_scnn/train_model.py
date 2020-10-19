@@ -1,9 +1,6 @@
-import yaml
 from pathlib import Path
 import time
-import glob
 from argparse import ArgumentParser
-import math
 
 import tensorflow as tf
 from tensorflow import keras
@@ -17,8 +14,8 @@ from fast_scnn.model import generate_model
 class Trainer(object):
     # TODO: Load params from config yaml file
     def __init__(self, *, train_dir, train_label_dir, val_dir, val_label_dir, save_dir,
-                 sess_name, input_names, output_names, autotune_dataset,
-                 epochs, seed=None, end_learning_rate, batch_size=12):
+                 sess_name, input_names, output_names, autotune_dataset, resize_aux,
+                 epochs, early_stopping, seed=None, end_learning_rate, batch_size=12):
 
         self.save_dir = Path(save_dir, sess_name)
         self.save_dir.mkdir(exist_ok=True, parents=True)
@@ -27,6 +24,7 @@ class Trainer(object):
         self.output_layer_names = output_names
 
         self.epochs = epochs
+        self.early_stopping = early_stopping
         self.seed = seed
         self.end_learning_rate = end_learning_rate
         self.batch_size = batch_size
@@ -35,11 +33,11 @@ class Trainer(object):
 
         print('\nPrepping training dataset...\n')
         self.train_ds, self.n_train_data = CityScapesDataset(data_dir=train_dir, label_dir=train_label_dir, seed=self.seed, batch_size=self.batch_size,
-                                                             augment=True, output_names=output_names,
+                                                             augment=True, output_names=output_names, resize_aux=resize_aux,
                                                              autotune=autotune_dataset).generate_dataset()
         print('\nPrepping validation dataset...\n')
         self.val_ds, _ = CityScapesDataset(data_dir=val_dir, label_dir=val_label_dir, seed=self.seed, batch_size=self.batch_size//2,
-                                           augment=False, output_names=output_names,
+                                           augment=False, output_names=output_names, resize_aux=resize_aux,
                                            autotune=autotune_dataset).generate_dataset()
 
     def get_model(self):
@@ -51,17 +49,18 @@ class Trainer(object):
         ckpt_path = Path(self.save_dir, 'checkpoints')
         cp_cb = keras.callbacks.ModelCheckpoint(filepath=str(ckpt_path), monitor='val_loss', verbose=1, save_best_only=False)
 
-        es_cb = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50,
-                                              restore_best_weights=True)
         tb_cb = keras.callbacks.TensorBoard(log_dir=str(self.save_dir), histogram_freq=1, write_graph=True, write_images=False,
                                             update_freq='epoch')
-        # img_cb = train_utils.TFImageCallback(model_save_dir=self.save_dir, seg_id_list=self.sim_seg_id_list,
-        #                                      input_layer_names=self.input_layer_names, output_layer_names=self.output_layer_names,
-        #                                      id22rgb_dict=self.id2rgb_dict)
-        return [cp_cb, es_cb, tb_cb]
+        callbacks_list = [cp_cb, tb_cb]
+        if self.early_stopping:
+            es_cb = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50,
+                                                  restore_best_weights=True)
+            callbacks_list.append(es_cb)
+
+        return callbacks_list
 
     def load_model(self):
-        return keras.models.load_model(self.save_dir)
+        return keras.models.load_model(str(Path(self.save_dir, 'checkpoints')))
 
     def __call__(self, mode):
         callback_list = self.get_callbacks()
@@ -96,6 +95,7 @@ class Trainer(object):
 
 
 def main(args):
+    tf.keras.backend.clear_session()
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         try:
@@ -118,12 +118,14 @@ def main(args):
                       save_dir=train_config['save_dir'],
                       sess_name=train_config['sess_name'],
                       epochs=train_config['epochs'],
+                      early_stopping=train_config['early_stopping'],
                       seed=train_config['seed'],
                       end_learning_rate=train_config['end_learning_rate'],
                       batch_size=train_config['batch_size'],
                       input_names=train_config['input_names'],
                       output_names=train_config['output_names'],
-                      autotune_dataset=train_config['autotune_dataset'])
+                      autotune_dataset=train_config['autotune_dataset'],
+                      resize_aux=train_config['resize_aux'])
 
     trainer(args.mode)
 
