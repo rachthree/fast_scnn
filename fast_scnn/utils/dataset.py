@@ -119,7 +119,7 @@ class CityScapesDataset(object):
         return img_batch, out_dict
 
     def generate_dataset(self):
-        files = tf.io.matching_files(str(Path(self.data_dir, '*.png')))
+        files = tf.io.match_filenames_once(str(Path(self.data_dir, '*/*.png')))
         dataset_size = tf.cast(tf.shape(files)[0], tf.int64).numpy()
 
         dataset = tf.data.Dataset.from_tensor_slices(files)
