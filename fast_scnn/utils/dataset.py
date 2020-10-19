@@ -8,8 +8,8 @@ AUTO = tf.data.experimental.AUTOTUNE
 
 
 class CityScapesDataset(object):
-    def __init__(self, *, data_dir, label_dir, prefetch=1, batch_size=32, seed=None, num_parallel_calls=4, img_norm=True,
-                 output_names=None, augment=False, autotune=False, data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
+    def __init__(self, *, data_dir, label_dir, prefetch=1, batch_size=32, seed=None, num_parallel_calls=1, img_norm=True,
+                 output_names=None, resize_aux=None, augment=False, autotune=False, data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
         self.data_dir = data_dir
         self.data_suffix = data_suffix
         self.label_dir = label_dir
@@ -21,6 +21,7 @@ class CityScapesDataset(object):
         self.img_norm = img_norm
         self.output_names = output_names
         self.augment = augment
+        self.resize_aux = resize_aux
 
         if self.seed is not None:
             np.random.seed(self.seed)
@@ -84,33 +85,20 @@ class CityScapesDataset(object):
                                     preserve_aspect_ratio=True)
 
         # Random translation/crop - both image and label
-        io_cat = tf.concat([img_batch, output_batch], axis=-1)
-        n_dim = tf.shape(io_cat)[-1]
-        if tf.random.uniform([]) > 0.5:
-            # # Minimum size of crop: quarter of image
-            # kh = tf.random.uniform([], minval=0, maxval=0.5, dtype=tf.float32, seed=self.seed)
-            # kw = tf.random.uniform([], minval=0, maxval=0.5, dtype=tf.float32, seed=self.seed)
-            # target_kh = tf.random.uniform([], minval=0.5, maxval=(1.0 - kh), dtype=tf.float32, seed=self.seed)
-            # target_kw = tf.random.uniform([], minval=0.5, maxval=(1.0 - kw), dtype=tf.float32, seed=self.seed)
-            # offset_height = tf.cast(kh*h, tf.int32)
-            # offset_width = tf.cast(kw*w, tf.int32)
-            # target_height = tf.cast(target_kh*h, tf.int32)
-            # target_width = tf.cast(target_kw*w, tf.int32)
-            # # io_cat = tf.image.crop_to_bounding_box(io_cat, offset_height=offset_height, offset_width=offset_width,
-            # #                                        target_height=target_height, target_width=target_width)
-            # img_aug = tf.image.crop_to_bounding_box(img_aug, offset_height=offset_height, offset_width=offset_width,
-            #                                         target_height=target_height, target_width=target_width)
-            # label_aug = tf.image.crop_to_bounding_box(label_aug, offset_height=offset_height, offset_width=offset_width,
-            #                                           target_height=target_height, target_width=target_width)
-            kh = tf.random.uniform([], minval=0.5, maxval=1.0, dtype=tf.float32, seed=self.seed)
-            kw = tf.random.uniform([], minval=0.5, maxval=1.0, dtype=tf.float32, seed=self.seed)
-            crop_h = tf.cast(kh*h, tf.int32)
-            crop_w = tf.cast(kw*w, tf.int32)
-            io_cat = tf.image.random_crop(io_cat, (n, crop_h, crop_w, n_dim), seed=self.seed)
 
+        if scale > 1.0:
+            # crop to input shape
+            io_cat = tf.concat([img_batch, output_batch], axis=-1)
+            n_dim = tf.shape(io_cat)[-1]
 
-        # ONLY IMAGE
-        img_aug, output_aug = io_cat[..., :3], io_cat[..., 3:]
+            io_cat = tf.image.random_crop(io_cat, (n, img_batch_shape[1], img_batch_shape[2], n_dim), seed=self.seed)
+            img_aug, label_aug = io_cat[..., :3], io_cat[..., 3:]
+
+        elif scale < 1.0:
+            # resize using padding
+            img_aug = tf.image.resize_with_crop_or_pad(img_batch, img_batch_shape[1], img_batch_shape[2])
+            label_aug = tf.image.resize_with_crop_or_pad(output_batch, img_batch_shape[1], img_batch_shape[2])
+
 
         # GaussianNoise layer to be added to model directly
         # Order of operations does matter... randomize operations
@@ -121,14 +109,17 @@ class CityScapesDataset(object):
         return img_aug, label_aug
 
     def output_aux(self, img_batch, output_batch):
-        out_dict = {}
+        out_dict = {'output': output_batch}
         for layer in self.output_names:
-            out_dict[layer] = output_batch
+            if layer != 'output':
+                out_dict[layer] = tf.image.resize(output_batch, (self.resize_aux[layer][0], self.resize_aux[layer][1]),
+                                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+                                                  preserve_aspect_ratio=True)
 
         return img_batch, out_dict
 
     def generate_dataset(self):
-        files = tf.io.matching_files(str(Path(self.data_dir, '*.png')))
+        files = tf.io.match_filenames_once(str(Path(self.data_dir, '*/*.png')))
         dataset_size = tf.cast(tf.shape(files)[0], tf.int64).numpy()
 
         dataset = tf.data.Dataset.from_tensor_slices(files)
