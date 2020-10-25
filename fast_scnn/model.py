@@ -11,7 +11,7 @@ def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_
     img_shape = (h, w, 3)
 
     input_layer = tf.keras.layers.Input(shape=img_shape, name='input_layer')
-    input_shape = input_layer.shape   # tf.shape(input_layer)
+    input_shape = input_layer.shape
 
     gaus_layer = tf.keras.layers.GaussianNoise(stddev=0.02)(input_layer)
     ds_layer = layers.down_sample(gaus_layer)
