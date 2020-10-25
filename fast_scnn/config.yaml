@@ -1,12 +1,12 @@
 train:
-  train_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\train
-  train_label_dir: E:\datasets\Cityscapes\gtFine\train
-  val_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\val
-  val_label_dir: E:\datasets\Cityscapes\gtFine\val
+  train_dir: <drive>SSD_1TB/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/train
+  train_label_dir: <drive>SSD_1TB/datasets/Cityscapes/gtFine/train
+  val_dir: <drive>SSD_1TB/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/val
+  val_label_dir: <drive>SSD_1TB/datasets/Cityscapes/gtFine/val
   sess_name: v1
   # seed:
   # epochs:
-  batch_size: 12
+  batch_size: 4
   early_stopping: False
   # end_learning_rate:
   # save_dir:
@@ -16,3 +16,13 @@ train:
   resize_aux:
     ds_aux: [128, 256]
     gfe_aux: [32, 64]
+  gpu_dist:
+    input: /gpu:0
+    ds: /gpu:0
+    gfe: /gpu:0
+    ff_ds: /gpu:0
+    ff_gfe: /gpu:0
+    ff_add: /gpu:0
+    output: /gpu:1
+    ds_aux: /gpu:1
+    gfe_aux: /gpu:1

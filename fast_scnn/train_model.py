@@ -15,7 +15,8 @@ class Trainer(object):
     # TODO: Load params from config yaml file
     def __init__(self, *, train_dir, train_label_dir, val_dir, val_label_dir, save_dir,
                  sess_name, input_names, output_names, autotune_dataset, resize_aux,
-                 epochs, early_stopping, seed=None, end_learning_rate, batch_size=12):
+                 epochs, early_stopping, seed=None, end_learning_rate, batch_size=12,
+                 gpu_dist):
 
         self.save_dir = Path(save_dir, sess_name)
         self.save_dir.mkdir(exist_ok=True, parents=True)
@@ -28,6 +29,7 @@ class Trainer(object):
         self.seed = seed
         self.end_learning_rate = end_learning_rate
         self.batch_size = batch_size
+        self.gpu_dist = gpu_dist
 
         self.sess_name = time.ctime(time.time()).replace(':', '.') if sess_name is None else sess_name
 
@@ -43,7 +45,7 @@ class Trainer(object):
     def get_model(self):
         n_classes = len(eval_labels)
 
-        return generate_model(n_classes)
+        return generate_model(n_classes, gpu_dist=self.gpu_dist)
 
     def get_callbacks(self):
         ckpt_path = Path(self.save_dir, 'checkpoints')
@@ -76,7 +78,8 @@ class Trainer(object):
             model.compile(loss=loss_dict, loss_weights=loss_weights, optimizer=optimizer, metrics=['accuracy'])
 
             print('\nModel created. Training now...\n')
-            history = model.fit(self.train_ds, epochs=self.epochs, validation_data=self.val_ds, callbacks=callback_list)
+            with tf.device('/gpu:0'):
+                history = model.fit(self.train_ds, epochs=self.epochs, validation_data=self.val_ds, callbacks=callback_list)
 
         elif mode == 'resume':
             print('\nLoading model...\n')
@@ -97,6 +100,7 @@ class Trainer(object):
 def main(args):
     tf.keras.backend.clear_session()
     gpus = tf.config.experimental.list_physical_devices('GPU')
+    tf.debugging.set_log_device_placement(True)
     if gpus:
         try:
             # Currently, memory growth needs to be the same across GPUs
@@ -125,7 +129,8 @@ def main(args):
                       input_names=train_config['input_names'],
                       output_names=train_config['output_names'],
                       autotune_dataset=train_config['autotune_dataset'],
-                      resize_aux=train_config['resize_aux'])
+                      resize_aux=train_config['resize_aux'],
+                      gpu_dist=train_config['gpu_dist'])
 
     trainer(args.mode)
 

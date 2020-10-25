@@ -4,19 +4,24 @@ from tensorflow.keras import layers
 # import tensorflow_addons as tfa
 
 
-def down_sample(input_layer):
-    ds = layers.Conv2D(32, (3, 3), padding='same', strides=(2, 2),
-                       kernel_regularizer=keras.regularizers.L2(l2=0.00004))(input_layer)
-    ds = layers.BatchNormalization()(ds)
-    ds = layers.Activation('relu')(ds)
+def down_sample(input_layer, gpu_dist=None):
+    if gpu_dist is None:
+        gpu_dist = {'ds': '/gpu:0'}
 
-    ds = layers.SeparableConv2D(48, (3, 3), padding='same', strides=(2, 2))(ds)
-    ds = layers.BatchNormalization()(ds)
-    ds = layers.Activation('relu')(ds)
+    print(f"DS module is using {gpu_dist['ds']}")
+    with tf.device(gpu_dist['ds']):
+        ds = layers.Conv2D(32, (3, 3), padding='same', strides=(2, 2),
+                           kernel_regularizer=keras.regularizers.L2(l2=0.00004))(input_layer)
+        ds = layers.BatchNormalization()(ds)
+        ds = layers.Activation('relu')(ds)
 
-    ds = layers.SeparableConv2D(64, (3, 3), padding='same', strides=(2, 2))(ds)
-    ds = layers.BatchNormalization()(ds)
-    ds = layers.Activation('relu')(ds)
+        ds = layers.SeparableConv2D(48, (3, 3), padding='same', strides=(2, 2))(ds)
+        ds = layers.BatchNormalization()(ds)
+        ds = layers.Activation('relu')(ds)
+
+        ds = layers.SeparableConv2D(64, (3, 3), padding='same', strides=(2, 2))(ds)
+        ds = layers.BatchNormalization()(ds)
+        ds = layers.Activation('relu')(ds)
 
     return ds
 
@@ -77,76 +82,103 @@ def pyramid_pooling_block(input_tensor, bin_sizes, reduce_dims=True):
     return layers.concatenate(concat_list)
 
 
-def global_feature_extractor(lds_layer):
-    gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t=6, strides=2, n=3)
-    gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t=6, strides=2, n=3)
-    gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t=6, strides=1, n=3)
-    gfe_shape = tf.shape(gfe_layer)
-    gfe_layer = pyramid_pooling_block(gfe_layer, [1, 2, 3, 6], reduce_dims=True)  # 2 4 6 8?
+def global_feature_extractor(lds_layer, gpu_dist=None):
+    if gpu_dist is None:
+        gpu_dist = {'gfe': '/gpu:0'}
+
+    print(f"GFE module is using {gpu_dist['gfe']}")
+    with tf.device(gpu_dist['gfe']):
+        gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t=6, strides=2, n=3)
+        gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t=6, strides=2, n=3)
+        gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t=6, strides=1, n=3)
+        gfe_layer = pyramid_pooling_block(gfe_layer, [1, 2, 3, 6], reduce_dims=True)
 
     return gfe_layer
 
 
-def feature_fusion(lds_layer, gfe_layer):
-    ff_layer1 = layers.Conv2D(128, (1, 1), padding='same', strides=(1, 1),
-                              kernel_regularizer=keras.regularizers.L2(l2=0.00004))(lds_layer)
+def feature_fusion(lds_layer, gfe_layer, gpu_dist=None):
+    if gpu_dist is None:
+        gpu_dist = {'ff_ds:': '/gpu:0',
+                    'ff_gfe:': '/gpu:0',
+                    'ff_add': '/gpu:0'}
 
-    ff1_shape = ff_layer1.shape
-    gfe_shape = gfe_layer.shape
-    scale = (ff1_shape[1] // gfe_shape[1], ff1_shape[2] // gfe_shape[2])
-    ff_layer2 = layers.experimental.preprocessing.Resizing(ff1_shape[1], ff1_shape[2], interpolation='bilinear')(gfe_layer)
-    ff_layer2 = layers.DepthwiseConv2D((3, 3), strides=1, padding='same', dilation_rate=scale)(ff_layer2)
-    ff_layer2 = layers.BatchNormalization()(ff_layer2)
-    ff_layer2 = layers.Activation('relu')(ff_layer2)
-    ff_layer2 = layers.Conv2D(128, kernel_size=1, strides=1, padding='same', activation=None,
-                              kernel_regularizer=keras.regularizers.L2(l2=0.00004))(ff_layer2)
+    with tf.device(gpu_dist['ff_ds']):
+        print(f"FF module, DS portion is using {gpu_dist['ff_ds']}")
+        ff_layer1 = layers.Conv2D(128, (1, 1), padding='same', strides=(1, 1),
+                                  kernel_regularizer=keras.regularizers.L2(l2=0.00004))(lds_layer)
 
-    ff_final = layers.add([ff_layer1, ff_layer2])
-    ff_final = layers.BatchNormalization()(ff_final)
-    ff_final = layers.Activation('relu')(ff_final)
+    with tf.device(gpu_dist['ff_gfe']):
+        print(f"FF module, GFE portion is using {gpu_dist['ff_gfe']}")
+        ff1_shape = ff_layer1.shape
+        gfe_shape = gfe_layer.shape
+        scale = (ff1_shape[1] // gfe_shape[1], ff1_shape[2] // gfe_shape[2])
+        ff_layer2 = layers.experimental.preprocessing.Resizing(ff1_shape[1], ff1_shape[2], interpolation='bilinear')(gfe_layer)
+        ff_layer2 = layers.DepthwiseConv2D((3, 3), strides=1, padding='same', dilation_rate=scale)(ff_layer2)
+        ff_layer2 = layers.BatchNormalization()(ff_layer2)
+        ff_layer2 = layers.Activation('relu')(ff_layer2)
+        ff_layer2 = layers.Conv2D(128, kernel_size=1, strides=1, padding='same', activation=None,
+                                  kernel_regularizer=keras.regularizers.L2(l2=0.00004))(ff_layer2)
+
+    with tf.device(gpu_dist['ff_add']):
+        print(f"FF module, ADD portion module is using {gpu_dist['ff_add']}")
+        ff_final = layers.add([ff_layer1, ff_layer2])
+        ff_final = layers.BatchNormalization()(ff_final)
+        ff_final = layers.Activation('relu')(ff_final)
 
     return ff_final
 
 
-def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=None):
-    if resize_input is not None:
-        input_tensor = layers.experimental.preprocessing.Resizing(resize_input[0], resize_input[1], interpolation='bilinear')(input_tensor)
-    classifier = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
-    classifier = layers.BatchNormalization()(classifier)
-    classifier = layers.Activation('relu')(classifier)
+def classifier_layer(input_tensor, img_size, num_classes, name, gpu_dist=None):
+    if gpu_dist is None:
+        gpu_dist = {'output:': '/gpu:0'}
 
-    classifier = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(classifier)
-    classifier = layers.BatchNormalization()(classifier)
-    classifier = layers.Activation('relu')(classifier)
+    print(f"Output module is using {gpu_dist['output']}")
 
-    classifier = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
-                               kernel_regularizer=keras.regularizers.L2(l2=0.00004))(classifier)
-    classifier = layers.BatchNormalization()(classifier)
-    classifier = layers.Activation('relu')(classifier)
+    with tf.device(gpu_dist['output']):
+        classifier = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
+        classifier = layers.BatchNormalization()(classifier)
+        classifier = layers.Activation('relu')(classifier)
 
-    classifier = layers.experimental.preprocessing.Resizing(img_size[0], img_size[1], interpolation='bilinear')(classifier)
-    classifier = layers.Dropout(0.3)(classifier)
-    classifier = layers.Softmax(name=name)(classifier)
+        classifier = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(classifier)
+        classifier = layers.BatchNormalization()(classifier)
+        classifier = layers.Activation('relu')(classifier)
+
+        classifier = layers.Dropout(0.3)(classifier)
+        classifier = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
+                                   kernel_regularizer=keras.regularizers.L2(l2=0.00004))(classifier)
+        classifier = layers.BatchNormalization()(classifier)
+        #classifier = layers.Activation('relu')(classifier)
+
+        classifier = layers.experimental.preprocessing.Resizing(img_size[0], img_size[1], interpolation='bilinear')(classifier)
+        #classifier = layers.Dropout(0.3)(classifier)
+        classifier = layers.Softmax(name=name)(classifier)
 
     return classifier
 
 
-def aux_layer(input_tensor, num_classes, name):
-    aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
-    aux = layers.BatchNormalization()(aux)
-    aux = layers.Activation('relu')(aux)
+def aux_layer(input_tensor, num_classes, name, gpu=None):
+    if gpu is None:
+        gpu = '/gpu:0'
 
-    aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(aux)
-    aux = layers.BatchNormalization()(aux)
-    aux = layers.Activation('relu')(aux)
+    print(f"{name} module is using {gpu}")
 
-    aux = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
-                        kernel_regularizer=keras.regularizers.L2(l2=0.00004))(aux)
-    aux = layers.BatchNormalization()(aux)
-    aux = layers.Activation('relu')(aux)
+    with tf.device(gpu):
+        aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
+        aux = layers.BatchNormalization()(aux)
+        aux = layers.Activation('relu')(aux)
 
-    aux = layers.Dropout(0.3)(aux)
-    aux = layers.Softmax(name=name)(aux)
+        aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(aux)
+        aux = layers.BatchNormalization()(aux)
+        aux = layers.Activation('relu')(aux)
+
+        aux = layers.Dropout(0.3)(aux)
+        aux = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
+                            kernel_regularizer=keras.regularizers.L2(l2=0.00004))(aux)
+        aux = layers.BatchNormalization()(aux)
+        #aux = layers.Activation('relu')(aux)
+
+        #aux = layers.Dropout(0.3)(aux)
+        aux = layers.Softmax(name=name)(aux)
 
     return aux
 
@@ -167,7 +199,7 @@ class ClassifierBlock(keras.layers.Layer):
         self.conv2d = layers.Conv2D(n_classes, (1, 1), padding='same', strides=(1, 1),
                                     kernel_regularizer=keras.regularizers.L2(l2=0.00004))
         self.batch_norm3 = layers.BatchNormalization()
-        self.act_relu3 = layers.Activation('relu')
+        # self.act_relu3 = layers.Activation('relu')
 
         # resize here
 
@@ -189,13 +221,14 @@ class ClassifierBlock(keras.layers.Layer):
         classifier = self.batch_norm2(classifier, training=training)
         classifier = self.act_relu2(classifier)
 
+        classifier = self.dropout(classifier, training=training)
         classifier = self.conv2d(classifier)
         classifier = self.batch_norm3(classifier)
-        classifier = self.act_relu3(classifier)
+        # classifier = self.act_relu3(classifier)
 
         classifier = layers.experimental.preprocessing.Resizing(input_layer_shape[1], input_layer_shape[2],
                                                                 interpolation='bilinear')(classifier)
-        classifier = self.dropout(classifier, training=training)
+        # classifier = self.dropout(classifier, training=training)
         classifier = self.softmax(classifier)
 
         return classifier

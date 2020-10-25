@@ -17,7 +17,17 @@ TRAIN_DEFAULTS = {'train_dir': r"E:\datasets\Cityscapes\leftImg8bit_trainvaltest
                   'input_names': ['input_layer'],
                   'output_names': ['output', 'ds_aux', 'gfe_aux'],
                   'autotune_dataset': False,
-                  'aux_resize': None}
+                  'aux_resize': None,
+                  'gpu_dist': {'input:': '/gpu:0',
+                               'ds:': '/gpu:0',
+                               'gfe:': '/gpu:0',
+                               'ff_ds:': '/gpu:0',
+                               'ff_gfe:': '/gpu:0',
+                               'ff_add': '/gpu:0',
+                               'output': '/gpu:0',
+                               'ds_aux': '/gpu:0',
+                               'gfe_aux': '/gpu:0'}
+                  }
 
 def load_config(config_filepath):
     with open(config_filepath, 'r') as f:
