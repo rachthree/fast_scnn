@@ -3,10 +3,10 @@ import time
 from copy import deepcopy
 from pathlib import Path
 
-TRAIN_DEFAULTS = {'train_dir': r"E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\train",
-                  'train_label_dir': r"E:\datasets\Cityscapes\gtFine\train",
-                  'val_dir': r"E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\val",
-                  'val_label_dir': r"E:\datasets\Cityscapes\gtFine\val",
+TRAIN_DEFAULTS = {'train_dir': "E:/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/train",
+                  'train_label_dir': "E:/datasets/Cityscapes/gtFine/train",
+                  'val_dir': "E:/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/val",
+                  'val_label_dir': "E:/datasets/Cityscapes/gtFine/val",
                   'save_dir': str(Path(__file__).parent.parent.parent.joinpath('model_training')),
                   'sess_name': time.ctime(time.time()).replace(':', '.'),
                   'seed': None,
@@ -17,7 +17,9 @@ TRAIN_DEFAULTS = {'train_dir': r"E:\datasets\Cityscapes\leftImg8bit_trainvaltest
                   'input_names': ['input_layer'],
                   'output_names': ['output', 'ds_aux', 'gfe_aux'],
                   'autotune_dataset': False,
-                  'aux_resize': None}
+                  'aux_resize': None,
+                  'float_type': 'float32'
+                  }
 
 def load_config(config_filepath):
     with open(config_filepath, 'r') as f:

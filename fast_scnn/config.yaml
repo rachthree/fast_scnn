@@ -3,7 +3,7 @@ train:
   train_label_dir: <dir>/datasets/Cityscapes/gtFine/train
   val_dir: <dir>/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/val
   val_label_dir: <dir>/datasets/Cityscapes/gtFine/val
-  sess_name: v1
+  sess_name: v2
   # seed:
   # epochs:
   batch_size: 12
@@ -16,3 +16,4 @@ train:
   resize_aux:
     ds_aux: [128, 256]
     gfe_aux: [32, 64]
+  float_type: 'float16'

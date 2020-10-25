@@ -12,9 +12,8 @@ from fast_scnn.model import generate_model
 
 
 class Trainer(object):
-    # TODO: Load params from config yaml file
     def __init__(self, *, train_dir, train_label_dir, val_dir, val_label_dir, save_dir,
-                 sess_name, input_names, output_names, autotune_dataset, resize_aux,
+                 sess_name, input_names, output_names, autotune_dataset, resize_aux, float_type,
                  epochs, early_stopping, seed=None, end_learning_rate, batch_size=12):
 
         self.save_dir = Path(save_dir, sess_name)
@@ -32,11 +31,11 @@ class Trainer(object):
         self.sess_name = time.ctime(time.time()).replace(':', '.') if sess_name is None else sess_name
 
         print('\nPrepping training dataset...\n')
-        self.train_ds, self.n_train_data = CityScapesDataset(data_dir=train_dir, label_dir=train_label_dir, seed=self.seed, batch_size=self.batch_size,
-                                                             augment=True, output_names=output_names, resize_aux=resize_aux,
+        self.train_ds, self.n_train_data = CityScapesDataset(data_dir=str(Path(train_dir)), label_dir=str(Path(train_label_dir)), seed=self.seed, batch_size=self.batch_size,
+                                                             augment=True, output_names=output_names, resize_aux=resize_aux, float_type=float_type,
                                                              autotune=autotune_dataset).generate_dataset()
         print('\nPrepping validation dataset...\n')
-        self.val_ds, _ = CityScapesDataset(data_dir=val_dir, label_dir=val_label_dir, seed=self.seed, batch_size=self.batch_size//2,
+        self.val_ds, _ = CityScapesDataset(data_dir=str(Path(val_dir)), label_dir=str(Path(val_label_dir)), seed=self.seed, batch_size=self.batch_size, float_type=float_type,
                                            augment=False, output_names=output_names, resize_aux=resize_aux,
                                            autotune=autotune_dataset).generate_dataset()
 
@@ -125,7 +124,9 @@ def main(args):
                       input_names=train_config['input_names'],
                       output_names=train_config['output_names'],
                       autotune_dataset=train_config['autotune_dataset'],
-                      resize_aux=train_config['resize_aux'])
+                      resize_aux=train_config['resize_aux'],
+                      float_type=train_config['float_type']
+                      )
 
     trainer(args.mode)
 

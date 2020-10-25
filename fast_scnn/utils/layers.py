@@ -134,9 +134,9 @@ def aux_layer(input_tensor, num_classes, name):
     aux = layers.BatchNormalization()(aux)
     aux = layers.Activation('relu')(aux)
 
-    aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(aux)
-    aux = layers.BatchNormalization()(aux)
-    aux = layers.Activation('relu')(aux)
+    # aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(aux)
+    # aux = layers.BatchNormalization()(aux)
+    # aux = layers.Activation('relu')(aux)
 
     aux = layers.Dropout(0.3)(aux)
     aux = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),

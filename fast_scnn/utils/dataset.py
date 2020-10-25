@@ -9,7 +9,8 @@ AUTO = tf.data.experimental.AUTOTUNE
 
 class CityScapesDataset(object):
     def __init__(self, *, data_dir, label_dir, prefetch=1, batch_size=32, seed=None, num_parallel_calls=1, img_norm=True,
-                 output_names=None, resize_aux=None, augment=False, autotune=False, data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
+                 output_names=None, resize_aux=None, augment=False, autotune=False, float_type='float32',
+                 data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
         self.data_dir = data_dir
         self.data_suffix = data_suffix
         self.label_dir = label_dir
@@ -30,6 +31,15 @@ class CityScapesDataset(object):
             self.prefetch = AUTO
             self.num_parallel_calls = AUTO
 
+        if float_type == 'float32':
+            self.tf_float = tf.float32
+
+        elif float_type == 'float16':
+            self.tf_float = tf.float16
+
+        else:
+            raise ValueError(f"float_type {float_type} is not recognized")
+
         # Random color channels noise - only to image - hue, saturation, contrast?
         # Random brightness - only to image
         self.color_ops = [lambda img: tf.image.random_hue(img, 0.2, seed=seed),
@@ -44,14 +54,14 @@ class CityScapesDataset(object):
         img_str = tf.io.read_file(filepath)
         img = tf.image.decode_png(img_str, channels=0)
         img = img[..., :3]
-        img = tf.cast(img, tf.float32)
+        img = tf.cast(img, self.tf_float)
         img_shape = tf.shape(img)
 
         label_str = tf.io.read_file(label_filepath)
         label = tf.image.decode_png(label_str, channels=0)
         label = label[..., 0]
         label = tf.reshape(label, (img_shape[0], img_shape[1]))  # tf.squeeze results in unknown shape
-        label = tf.cast(label, tf.int32)
+        label = tf.cast(label, tf.uint8)
 
         return img, label
 
@@ -68,21 +78,23 @@ class CityScapesDataset(object):
             img = tf.image.flip_left_right(img)
             label = tf.image.flip_left_right(label)
 
+        label = tf.cast(label, self.tf_float)
+
         return img, label
 
     def augment_batch(self, img_batch, output_batch):
         img_batch_shape = tf.shape(img_batch)
         n = img_batch_shape[0]
-        h = tf.cast(img_batch_shape[1], tf.float32)
-        w = tf.cast(img_batch_shape[2], tf.float32)
+        h = tf.cast(img_batch_shape[1], self.tf_float)
+        w = tf.cast(img_batch_shape[2], self.tf_float)
 
         # Random resizing - both image and label
-        scale = tf.random.uniform([], minval=0.5, maxval=2.0, dtype=tf.float32, seed=self.seed)
+        scale = tf.random.uniform([], minval=0.5, maxval=2.0, dtype=self.tf_float, seed=self.seed)
         resize_shape = tf.cast([scale*h, scale*w], tf.int32)
-        img_aug = tf.image.resize(img_batch, resize_shape, method=tf.image.ResizeMethod.BILINEAR,
-                                  preserve_aspect_ratio=True)
-        label_aug = tf.image.resize(output_batch, resize_shape, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-                                    preserve_aspect_ratio=True)
+        img_aug = tf.cast(tf.image.resize(img_batch, resize_shape, method=tf.image.ResizeMethod.BILINEAR,
+                                          preserve_aspect_ratio=True), self.tf_float)
+        label_aug = tf.cast(tf.image.resize(output_batch, resize_shape, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+                                            preserve_aspect_ratio=True), self.tf_float)
 
         # Random translation/crop - both image and label
 
@@ -96,8 +108,8 @@ class CityScapesDataset(object):
 
         elif scale < 1.0:
             # resize using padding
-            img_aug = tf.image.resize_with_crop_or_pad(img_batch, img_batch_shape[1], img_batch_shape[2])
-            label_aug = tf.image.resize_with_crop_or_pad(output_batch, img_batch_shape[1], img_batch_shape[2])
+            img_aug = tf.cast(tf.image.resize_with_crop_or_pad(img_batch, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
+            label_aug = tf.cast(tf.image.resize_with_crop_or_pad(output_batch, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
 
 
         # GaussianNoise layer to be added to model directly
