@@ -81,8 +81,7 @@ def global_feature_extractor(lds_layer):
     gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t=6, strides=2, n=3)
     gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t=6, strides=2, n=3)
     gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t=6, strides=1, n=3)
-    gfe_shape = tf.shape(gfe_layer)
-    gfe_layer = pyramid_pooling_block(gfe_layer, [1, 2, 3, 6], reduce_dims=True)  # 2 4 6 8?
+    gfe_layer = pyramid_pooling_block(gfe_layer, [1, 2, 3, 6], reduce_dims=True)
 
     return gfe_layer
 
@@ -119,13 +118,12 @@ def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=Non
     classifier = layers.BatchNormalization()(classifier)
     classifier = layers.Activation('relu')(classifier)
 
+    classifier = layers.Dropout(0.3)(classifier)
     classifier = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
                                kernel_regularizer=keras.regularizers.L2(l2=0.00004))(classifier)
     classifier = layers.BatchNormalization()(classifier)
-    classifier = layers.Activation('relu')(classifier)
 
     classifier = layers.experimental.preprocessing.Resizing(img_size[0], img_size[1], interpolation='bilinear')(classifier)
-    classifier = layers.Dropout(0.3)(classifier)
     classifier = layers.Softmax(name=name)(classifier)
 
     return classifier
@@ -140,62 +138,11 @@ def aux_layer(input_tensor, num_classes, name):
     aux = layers.BatchNormalization()(aux)
     aux = layers.Activation('relu')(aux)
 
+    aux = layers.Dropout(0.3)(aux)
     aux = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
                         kernel_regularizer=keras.regularizers.L2(l2=0.00004))(aux)
     aux = layers.BatchNormalization()(aux)
-    aux = layers.Activation('relu')(aux)
 
-    aux = layers.Dropout(0.3)(aux)
     aux = layers.Softmax(name=name)(aux)
 
     return aux
-
-
-class ClassifierBlock(keras.layers.Layer):
-    def __init__(self, *args, n_classes, **kwargs):
-        super(ClassifierBlock, self).__init__(*args, **kwargs)
-
-        # resize here
-        self.sepconv2d1 = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))
-        self.batch_norm1 = layers.BatchNormalization()
-        self.act_relu1 = layers.Activation('relu')
-
-        self.sepconv2d2 = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))
-        self.batch_norm2 = layers.BatchNormalization()
-        self.act_relu2 = layers.Activation('relu')
-
-        self.conv2d = layers.Conv2D(n_classes, (1, 1), padding='same', strides=(1, 1),
-                                    kernel_regularizer=keras.regularizers.L2(l2=0.00004))
-        self.batch_norm3 = layers.BatchNormalization()
-        self.act_relu3 = layers.Activation('relu')
-
-        # resize here
-
-        self.dropout = layers.Dropout(0.3)
-        self.softmax = layers.Softmax()
-
-    def call(self, prev_layer, input_layer, base_resize_layer=None, training=False):
-        layer1 = prev_layer
-        input_layer_shape = tf.shape(input_layer)
-        if base_resize_layer is not None:
-            base_layer_shape = tf.shape(base_resize_layer)
-            layer1 = layers.experimental.preprocessing.Resizing(base_layer_shape[1], base_layer_shape[2],
-                                                                interpolation='bilinear')(layer1)
-        classifier = self.sepconv2d1(layer1)
-        classifier = self.batch_norm1(classifier, training=training)
-        classifier = self.act_relu1(classifier)
-
-        classifier = self.sepconv2d2(classifier)
-        classifier = self.batch_norm2(classifier, training=training)
-        classifier = self.act_relu2(classifier)
-
-        classifier = self.conv2d(classifier)
-        classifier = self.batch_norm3(classifier)
-        classifier = self.act_relu3(classifier)
-
-        classifier = layers.experimental.preprocessing.Resizing(input_layer_shape[1], input_layer_shape[2],
-                                                                interpolation='bilinear')(classifier)
-        classifier = self.dropout(classifier, training=training)
-        classifier = self.softmax(classifier)
-
-        return classifier

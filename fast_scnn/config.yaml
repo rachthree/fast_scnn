@@ -1,8 +1,8 @@
 train:
-  train_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\train
-  train_label_dir: E:\datasets\Cityscapes\gtFine\train
-  val_dir: E:\datasets\Cityscapes\leftImg8bit_trainvaltest\leftImg8bit\val
-  val_label_dir: E:\datasets\Cityscapes\gtFine\val
+  train_dir: <dir>/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/train
+  train_label_dir: <dir>/datasets/Cityscapes/gtFine/train
+  val_dir: <dir>/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/val
+  val_label_dir: <dir>/datasets/Cityscapes/gtFine/val
   sess_name: v1
   # seed:
   # epochs:
