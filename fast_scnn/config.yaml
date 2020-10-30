@@ -3,16 +3,20 @@ train:
   train_label_dir: <dir>/datasets/Cityscapes/gtFine/train
   val_dir: <dir>/datasets/Cityscapes/leftImg8bit_trainvaltest/leftImg8bit/val
   val_label_dir: <dir>/datasets/Cityscapes/gtFine/val
-  sess_name: v1
-  # seed:
-  # epochs:
-  batch_size: 12
+  sess_name: v2
+  # seed: 42
+  epochs: 1000
+  batch_size: 8
+  num_parallel_calls: 1
+  prefetch: 4
+  autotune_dataset: False
   early_stopping: False
   # end_learning_rate:
   # save_dir:
   # input_names:
   # output_names:
-  autotune_dataset: False
   resize_aux:
     ds_aux: [128, 256]
     gfe_aux: [32, 64]
+  float_type: 'float32'
+  # resize_label: [128, 256]
