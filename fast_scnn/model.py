@@ -5,7 +5,7 @@ from tensorflow.keras import layers
 from fast_scnn.utils import layers
 
 
-def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_weight=0.4, summary=False):
+def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_weight=0.4, summary=False, resize_output=True):
     h, w = img_size
 
     img_shape = (h, w, 3)
@@ -18,7 +18,8 @@ def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_
     gfe_layer = layers.global_feature_extractor(ds_layer)
     ff_final = layers.feature_fusion(ds_layer, gfe_layer)
 
-    classifier = layers.classifier_layer(ff_final, (input_shape[1], input_shape[2]), n_classes, name='output')
+    classifier = layers.classifier_layer(ff_final, (input_shape[1], input_shape[2]), n_classes,
+                                         name='output', resize_output=resize_output)
     ds_aux = layers.aux_layer(ds_layer, n_classes, name='ds_aux')
     gfe_aux = layers.aux_layer(gfe_layer, n_classes, name='gfe_aux')
 

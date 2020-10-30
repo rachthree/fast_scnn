@@ -107,7 +107,7 @@ def feature_fusion(lds_layer, gfe_layer):
     return ff_final
 
 
-def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=None):
+def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=None, resize_output=True):
     if resize_input is not None:
         input_tensor = layers.experimental.preprocessing.Resizing(resize_input[0], resize_input[1], interpolation='bilinear')(input_tensor)
     classifier = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
@@ -123,7 +123,9 @@ def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=Non
                                kernel_regularizer=keras.regularizers.L2(l2=0.00004))(classifier)
     classifier = layers.BatchNormalization()(classifier)
 
-    classifier = layers.experimental.preprocessing.Resizing(img_size[0], img_size[1], interpolation='bilinear')(classifier)
+    if resize_output:
+        classifier = layers.experimental.preprocessing.Resizing(img_size[0], img_size[1], interpolation='bilinear')(classifier)
+
     classifier = layers.Softmax(name=name)(classifier)
 
     return classifier

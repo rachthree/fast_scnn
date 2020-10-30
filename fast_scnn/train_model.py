@@ -13,8 +13,9 @@ from fast_scnn.model import generate_model
 
 class Trainer(object):
     def __init__(self, *, train_dir, train_label_dir, val_dir, val_label_dir, save_dir,
-                 sess_name, input_names, output_names, autotune_dataset, resize_aux, float_type,
-                 epochs, early_stopping, seed=None, end_learning_rate, batch_size=12):
+                 sess_name, autotune_dataset=False, prefetch=1, num_parallel_calls=1,
+                 input_names, output_names, resize_aux, float_type,
+                 epochs, early_stopping, seed=None, end_learning_rate, batch_size=12, resize_label):
 
         self.save_dir = Path(save_dir, sess_name)
         self.save_dir.mkdir(exist_ok=True, parents=True)
@@ -30,19 +31,25 @@ class Trainer(object):
 
         self.sess_name = time.ctime(time.time()).replace(':', '.') if sess_name is None else sess_name
 
+        self.resize_output = False if (isinstance(resize_label, list) or isinstance(resize_label, tuple)) else True
+
         print('\nPrepping training dataset...\n')
         self.train_ds, self.n_train_data = CityScapesDataset(data_dir=str(Path(train_dir)), label_dir=str(Path(train_label_dir)), seed=self.seed, batch_size=self.batch_size,
-                                                             augment=True, output_names=output_names, resize_aux=resize_aux, float_type=float_type,
-                                                             autotune=autotune_dataset).generate_dataset()
+                                                             augment=True, output_names=output_names, resize_aux=resize_aux,
+                                                             float_type=float_type, resize_label=resize_label,
+                                                             autotune=autotune_dataset, prefetch=prefetch, num_parallel_calls=num_parallel_calls
+                                                             ).generate_dataset()
         print('\nPrepping validation dataset...\n')
-        self.val_ds, _ = CityScapesDataset(data_dir=str(Path(val_dir)), label_dir=str(Path(val_label_dir)), seed=self.seed, batch_size=self.batch_size, float_type=float_type,
+        self.val_ds, _ = CityScapesDataset(data_dir=str(Path(val_dir)), label_dir=str(Path(val_label_dir)), seed=self.seed, batch_size=self.batch_size,
                                            augment=False, output_names=output_names, resize_aux=resize_aux,
-                                           autotune=autotune_dataset).generate_dataset()
+                                           float_type=float_type, resize_label=resize_label,
+                                           autotune=autotune_dataset, prefetch=prefetch, num_parallel_calls=num_parallel_calls
+                                           ).generate_dataset()
 
     def get_model(self):
         n_classes = len(eval_labels)
 
-        return generate_model(n_classes)
+        return generate_model(n_classes, resize_output=self.resize_output)
 
     def get_callbacks(self):
         ckpt_path = Path(self.save_dir, 'checkpoints')
@@ -124,8 +131,11 @@ def main(args):
                       input_names=train_config['input_names'],
                       output_names=train_config['output_names'],
                       autotune_dataset=train_config['autotune_dataset'],
+                      prefetch=train_config['prefetch'],
+                      num_parallel_calls=train_config['num_parallel_calls'],
                       resize_aux=train_config['resize_aux'],
-                      float_type=train_config['float_type']
+                      float_type=train_config['float_type'],
+                      resize_label=train_config['resize_label']
                       )
 
     trainer(args.mode)
