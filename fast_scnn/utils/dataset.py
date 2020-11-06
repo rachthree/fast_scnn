@@ -9,7 +9,7 @@ AUTO = tf.data.experimental.AUTOTUNE
 
 class CityScapesDataset(object):
     def __init__(self, *, data_dir, label_dir, prefetch=1, batch_size=16, seed=None, num_parallel_calls=1, img_norm=True,
-                 output_names=None, resize_aux=None, augment=False, autotune=False, float_type='float32', resize_label=False,
+                 output_names=None, resize_aux_label=None, augment=False, autotune=False, float_type='float32', resize_label=False,
                  data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
         self.data_dir = data_dir
         self.data_suffix = data_suffix
@@ -22,7 +22,7 @@ class CityScapesDataset(object):
         self.img_norm = img_norm
         self.output_names = output_names
         self.augment = augment
-        self.resize_aux = resize_aux
+        self.resize_aux_label = resize_aux_label
         self.resize_label = resize_label
 
         if self.seed is not None:
@@ -77,8 +77,8 @@ class CityScapesDataset(object):
         label_str = tf.io.read_file(label_filepath)
         label = tf.image.decode_png(label_str, channels=0)
         label = label[..., 0]
-        label = tf.reshape(label, (img_shape[0], img_shape[1]))  # tf.squeeze results in unknown shape
-        label = tf.cast(label, tf.uint8)
+        # label = tf.reshape(label, (img_shape[0], img_shape[1]))  # tf.squeeze results in unknown shape
+        # label = tf.cast(label, tf.uint8)
 
         return img, label
 
@@ -147,9 +147,12 @@ class CityScapesDataset(object):
         out_dict = {'output': output_batch}
         for layer in self.output_names:
             if layer != 'output':
-                out_dict[layer] = tf.image.resize(output_batch, (self.resize_aux[layer][0], self.resize_aux[layer][1]),
-                                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-                                                  preserve_aspect_ratio=True)
+                if self.resize_aux_label is not None:
+                    out_dict[layer] = tf.image.resize(output_batch, (self.resize_aux_label[layer][0], self.resize_aux_label[layer][1]),
+                                                      method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+                                                      preserve_aspect_ratio=True)
+                else:
+                    out_dict[layer] = output_batch
 
         return img_batch, out_dict
 

@@ -5,7 +5,8 @@ from tensorflow.keras import layers
 from fast_scnn.utils import layers
 
 
-def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_weight=0.4, summary=False, resize_output=True):
+def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_weight=0.4, summary=False,
+                   resize_output=True, resize_aux=True):
     h, w = img_size
 
     img_shape = (h, w, 3)
@@ -20,8 +21,10 @@ def generate_model(n_classes, img_size=(1024, 2048), ds_aux_weight=0.4, gfe_aux_
 
     classifier = layers.classifier_layer(ff_final, (input_shape[1], input_shape[2]), n_classes,
                                          name='output', resize_output=resize_output)
-    ds_aux = layers.aux_layer(ds_layer, n_classes, name='ds_aux')
-    gfe_aux = layers.aux_layer(gfe_layer, n_classes, name='gfe_aux')
+
+    resize_aux_size = img_size if resize_aux else None
+    ds_aux = layers.aux_layer(ds_layer, n_classes, name='ds_aux', resize_aux_size=resize_aux_size)
+    gfe_aux = layers.aux_layer(gfe_layer, n_classes, name='gfe_aux', resize_aux_size=resize_aux_size)
 
     loss_dict = {'output': 'categorical_crossentropy',
                  'ds_aux': 'categorical_crossentropy',
