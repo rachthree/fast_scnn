@@ -19,7 +19,7 @@ TRAIN_DEFAULTS = {'train_dir': "E:/datasets/Cityscapes/leftImg8bit_trainvaltest/
                   'end_learning_rate': 0.00001,
                   'input_names': ['input_layer'],
                   'output_names': ['output', 'ds_aux', 'gfe_aux'],
-                  'aux_resize': None,
+                  'resize_aux_label': None,
                   'float_type': 'float32',
                   'resize_label': False,
                   }
