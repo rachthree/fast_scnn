@@ -2,6 +2,7 @@
 
 from __future__ import print_function, absolute_import, division
 from collections import namedtuple
+import numpy as np
 
 #--------------------------------------------------------------------------------
 # Definitions
@@ -97,3 +98,17 @@ labels = [
 eval_labels = [label for label in labels if not label.ignoreInEval]
 
 keep_labels = [not label.ignoreInEval for label in labels]
+
+label_colors = {label.id: label.color for label in labels}
+
+model2eval_id = {}
+for i, label in enumerate(eval_labels):
+    model2eval_id[i] = label.id
+
+
+def remap_mask_eval_id(mask):
+    eval_mask = np.copy(mask)
+    for model_id, eval_id in model2eval_id.items():
+        eval_mask[eval_mask == model_id] = eval_id
+
+    return eval_mask
