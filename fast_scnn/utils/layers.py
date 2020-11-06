@@ -131,7 +131,7 @@ def classifier_layer(input_tensor, img_size, num_classes, name, resize_input=Non
     return classifier
 
 
-def aux_layer(input_tensor, num_classes, name):
+def aux_layer(input_tensor, num_classes, name, resize_aux_size=None):
     aux = layers.SeparableConv2D(128, (3, 3), padding='same', strides=(1, 1))(input_tensor)
     aux = layers.BatchNormalization()(aux)
     aux = layers.Activation('relu')(aux)
@@ -144,6 +144,9 @@ def aux_layer(input_tensor, num_classes, name):
     aux = layers.Conv2D(num_classes, (1, 1), padding='same', strides=(1, 1),
                         kernel_regularizer=keras.regularizers.L2(l2=0.00004))(aux)
     aux = layers.BatchNormalization()(aux)
+
+    if resize_aux_size is not None:
+        aux = layers.experimental.preprocessing.Resizing(resize_aux_size[0], resize_aux_size[1], interpolation='bilinear')(aux)
 
     aux = layers.Softmax(name=name)(aux)
 
