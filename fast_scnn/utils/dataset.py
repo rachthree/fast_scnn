@@ -128,8 +128,8 @@ class CityScapesDataset(object):
 
         elif scale < 1.0:
             # resize using padding
-            img_aug = tf.cast(tf.image.resize_with_crop_or_pad(img_batch, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
-            label_aug = tf.cast(tf.image.resize_with_crop_or_pad(output_batch, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
+            img_aug = tf.cast(tf.image.resize_with_crop_or_pad(img_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
+            label_aug = tf.cast(tf.image.resize_with_crop_or_pad(label_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
 
         if self.resize_label:
             label_aug = tf.cast(tf.image.resize(label_aug, self.resize_label, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
