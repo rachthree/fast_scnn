@@ -9,7 +9,8 @@ AUTO = tf.data.experimental.AUTOTUNE
 
 class CityScapesDataset(object):
     def __init__(self, *, data_dir, label_dir, prefetch=1, batch_size=16, seed=None, num_parallel_calls=1, img_norm=True,
-                 output_names=None, resize_aux_label=None, augment=False, autotune=False, float_type='float32', resize_label=False,
+                 output_names=None, resize_aux_label=None, augment=False, autotune=False, float_type='float32',
+                 resize_label=False, crop_data=True,
                  data_suffix='_leftImg8bit', label_suffix='_gtFine_labelIds'):
         self.data_dir = data_dir
         self.data_suffix = data_suffix
@@ -24,6 +25,7 @@ class CityScapesDataset(object):
         self.augment = augment
         self.resize_aux_label = resize_aux_label
         self.resize_label = resize_label
+        self.crop_data = crop_data
 
         if self.seed is not None:
             np.random.seed(self.seed)
@@ -118,18 +120,18 @@ class CityScapesDataset(object):
 
         # Random translation/crop - both image and label
 
-        if scale > 1.0:
-            # crop to input shape
+        if scale > 1.0 and self.crop_data:
+            # crop to original input shape
             io_cat = tf.concat([img_aug, label_aug], axis=-1)
             n_dim = tf.shape(io_cat)[-1]
 
             io_cat = tf.image.random_crop(io_cat, (n, img_batch_shape[1], img_batch_shape[2], n_dim), seed=self.seed)
             img_aug, label_aug = io_cat[..., :3], io_cat[..., 3:]
 
-        elif scale < 1.0:
-            # resize using padding
-            img_aug = tf.cast(tf.image.resize_with_crop_or_pad(img_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
-            label_aug = tf.cast(tf.image.resize_with_crop_or_pad(label_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
+        # elif scale < 1.0:
+        #     # resize using padding
+        #     img_aug = tf.cast(tf.image.resize_with_crop_or_pad(img_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
+        #     label_aug = tf.cast(tf.image.resize_with_crop_or_pad(label_aug, img_batch_shape[1], img_batch_shape[2]), self.tf_float)
 
         if self.resize_label:
             label_aug = tf.cast(tf.image.resize(label_aug, self.resize_label, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
