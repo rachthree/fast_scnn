@@ -2,6 +2,8 @@
 
 from __future__ import print_function, absolute_import, division
 from collections import namedtuple
+import numpy as np
+import tensorflow as tf
 
 #--------------------------------------------------------------------------------
 # Definitions
@@ -64,8 +66,8 @@ labels = [
     Label(  'static'               ,  4 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),
     Label(  'dynamic'              ,  5 ,      255 , 'void'            , 0       , False        , True         , (111, 74,  0) ),
     Label(  'ground'               ,  6 ,      255 , 'void'            , 0       , False        , True         , ( 81,  0, 81) ),
-    Label(  'road'                 ,  7 ,        0 , 'flat'            , 1       , False        , False        , (128, 64,128) ),
-    Label(  'sidewalk'             ,  8 ,        1 , 'flat'            , 1       , False        , False        , (244, 35,232) ),
+    Label(  'road'                 ,  7 ,        0 , 'flat'            , 1       , False        , False        , (160,160,160) ), # 128, 64,128
+    Label(  'sidewalk'             ,  8 ,        1 , 'flat'            , 1       , False        , False        , (100,100,100) ), # 244, 35,232
     Label(  'parking'              ,  9 ,      255 , 'flat'            , 1       , False        , True         , (250,170,160) ),
     Label(  'rail track'           , 10 ,      255 , 'flat'            , 1       , False        , True         , (230,150,140) ),
     Label(  'building'             , 11 ,        2 , 'construction'    , 2       , False        , False        , ( 70, 70, 70) ),
@@ -81,7 +83,7 @@ labels = [
     Label(  'vegetation'           , 21 ,        8 , 'nature'          , 4       , False        , False        , (107,142, 35) ),
     Label(  'terrain'              , 22 ,        9 , 'nature'          , 4       , False        , False        , (152,251,152) ),
     Label(  'sky'                  , 23 ,       10 , 'sky'             , 5       , False        , False        , ( 70,130,180) ),
-    Label(  'person'               , 24 ,       11 , 'human'           , 6       , True         , False        , (220, 20, 60) ),
+    Label(  'person'               , 24 ,       11 , 'human'           , 6       , True         , False        , (255,255,  0) ), # 220, 20, 60
     Label(  'rider'                , 25 ,       12 , 'human'           , 6       , True         , False        , (255,  0,  0) ),
     Label(  'car'                  , 26 ,       13 , 'vehicle'         , 7       , True         , False        , (  0,  0,142) ),
     Label(  'truck'                , 27 ,       14 , 'vehicle'         , 7       , True         , False        , (  0,  0, 70) ),
@@ -97,3 +99,42 @@ labels = [
 eval_labels = [label for label in labels if not label.ignoreInEval]
 
 keep_labels = [not label.ignoreInEval for label in labels]
+
+label_colors = {label.id: label.color for label in labels}
+
+model2eval_id = {}
+for i, label in enumerate(eval_labels):
+    model2eval_id[i] = label.id
+
+
+def remap_mask_eval_id(mask):
+    eval_mask = np.copy(mask)
+    ids = np.unique(eval_mask)
+    for mask_id in ids:
+        eval_mask[mask == mask_id] = model2eval_id[mask_id]
+
+    return eval_mask
+
+
+def id_to_rgb(seg_id, id2rgb_dict):
+    # to be used with np.apply_along_axis with the segmentation ID array
+    seg_id = seg_id if isinstance(seg_id, int) else seg_id[0]
+    rgb = id2rgb_dict[seg_id]
+    return np.array([rgb[0], rgb[1], rgb[2]])
+
+
+def id2rgb_seg_img(id_seg_img, id2rgb_dict):
+    return np.array(np.apply_along_axis(id_to_rgb, 2, id_seg_img[:, :, np.newaxis], id2rgb_dict)).astype(np.uint8)
+
+
+def out_array_to_eval(out_array):
+    mask = np.argmax(out_array, axis=-1)
+    mask_remap = remap_mask_eval_id(mask)
+    return mask_remap
+
+
+def out_array_to_label_img(out_array):
+    mask_remap = out_array_to_eval(out_array)
+    mask_img = id2rgb_seg_img(mask_remap, label_colors)
+
+    return mask_img.astype(int)
