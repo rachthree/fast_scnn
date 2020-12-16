@@ -16,12 +16,17 @@ TRAIN_DEFAULTS = {'train_dir': "E:/datasets/Cityscapes/leftImg8bit_trainvaltest/
                   'prefetch': 1,
                   'num_parallel_calls': 1,
                   'autotune_dataset': False,
+                  'start_learning_rate': 0.045,
                   'end_learning_rate': 0.00001,
                   'input_names': ['input_layer'],
                   'output_names': ['output', 'ds_aux', 'gfe_aux'],
+                  'ds_aux': True,
+                  'gfe_aux': True,
                   'resize_aux_label': None,
                   'float_type': 'float32',
                   'resize_label': False,
+                  'input_size_factor': 1.0,
+                  'save_train_images': False
                   }
 
 def load_config(config_filepath):
